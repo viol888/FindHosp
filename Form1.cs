@@ -24,8 +24,7 @@ namespace FindHosp
         private static readonly HttpClient client = new HttpClient();
         private async void Button1_Click(object sender, EventArgs e)
         {            
-            string hospital;
-            var multipleRequestData = new List<HospitalAddressRequest>();
+            string hospital; 
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.DefaultExt = "*.xls;*.xlsx";
             ofd.Filter = "Microsoft Excel (*.xls*)|*.xls*";
@@ -57,7 +56,8 @@ namespace FindHosp
                     connection.Close();
 
                 }
-                string[] sheetsMass = sheets.Split('^');
+                sheets = sheets.Remove(sheets.Length - 1);
+                string[] sheetsMass = sheets.Split('^');                
                 foreach (string sht in sheetsMass)
                 {
                     if (sht == "")
@@ -73,100 +73,43 @@ namespace FindHosp
                     ad.Fill(ds);
                     DataTable tb = ds.Tables[0];
                     dataGridView1.DataSource = tb;
-                    for (int i = 0; i < dataGridView1.RowCount - 1; i++) 
-                    {                        
-                        hospital = "";                        
+                    var multipleRequestData = new List<HospitalAddressRequest>();
+                    List<List<HospitalAddressRequest>> twoDemList = new List<List<HospitalAddressRequest>>();
+                    int str = 0;
+                    for (int i = 0; i < dataGridView1.RowCount - 1; i++)
+                    {
+                        hospital = "";
                         tempStr = dataGridView1.Rows[i].Cells[1].Value.ToString().IndexOf('.') + 1;
                         hospital = dataGridView1.Rows[i].Cells[1].Value.ToString().Substring(tempStr).Trim() + "*" +
                             dataGridView1.Rows[i].Cells[2].Value.ToString().Replace(" ", "") +
-                            (dataGridView1.Rows[i].Cells[3].Value.ToString().Replace(" ", "") == "NULL" ? "" : 
+                            (dataGridView1.Rows[i].Cells[3].Value.ToString().Replace(" ", "") == "NULL" ? "" :
                             Int32.TryParse(dataGridView1.Rows[i].Cells[3].Value.ToString().Replace(" ", ""), out tempStr)
                             ? "/" + (dataGridView1.Rows[i].Cells[3].Value.ToString().Replace(" ", "")) : (dataGridView1.Rows[i].Cells[3].Value.ToString().Replace(" ", "")));
-                        if (hospital.Split('*')[0].Length > 3)
-                             multipleRequestData.Add(new HospitalAddressRequest() { StreetId = FindStreetId(hospital.Split('*')[0]), HouseNumber = hospital.Split('*')[1] });                        
-                        else
-                            multipleRequestData.Add(new HospitalAddressRequest() { StreetId = "Нет адреса", HouseNumber = "" });
-                        // SendList(multipleRequestData,i);
-                        /*
-                        if (hospital.Split('*')[0].Length > 3)
-                        {
-                            mass[i] = (FindStreetId(hospital.Split('*')[0]).ToString() + hospital);
-                        }
-                        if (i > 99)
-                        {
-                            if (i % 100 == 0)
-                            {
-                                if (hospital.Split('*')[0].Length > 3)
-                                {
-                                    mass[i] = (FindStreetId(hospital.Split('*')[0]).ToString()+ hospital);
-                                }
-                                SendMass(mass, i);
-                            }
-                        }
-                        else
-                        {
-                            mass[i] = hospital;
-                        }
-                        if (hospital.Split('*')[0] != "")
-                        {
-                            strID = FindStreetId(hospital.Split('*')[0]).ToString();
-                            house = hospital.Split('*')[1];                            
-
-                        }
-                        dataGridView1.Rows[i].Cells[0].Value = strID;
-                        */
-                        /*
-                        d = FindHospital(hospital);
-                        dataGridView1.Rows[i].Cells[0].Value = d;
-                        if (dataGridView1.RowCount > 100) 
-                        {
-                            if (i % 100 == 0 && i > 0)
-                            {
-
-                                for (int ii = i - 100; ii < i; ii++)
-                                {
-                                    worksheet.Rows[ii + 2].Columns[16] = dataGridView1.Rows[ii].Cells[0].Value;
-                                }
-
-                                excelapp.AlertBeforeOverwriting = false;
-                                workbook.Save();
-
-                            }
-
-                            label1.Text = i.ToString() + " " + sht;
-                            int t = (dataGridView1.RowCount) / 100;
-                            for (int ii = t * 100; ii < dataGridView1.RowCount; ii++)
-                            {
-                                worksheet.Rows[ii + 1].Columns[16] = dataGridView1.Rows[ii - 1].Cells[0].Value;
-                            }
-                        }
-                        else
-                        {
-
-                            worksheet.Rows[i + 2].Columns[16] = dataGridView1.Rows[i].Cells[0].Value;
-
-
-                        }*/
-
+                        hospital = hospital.Split('*')[0].Length < 3 ? hospital = "Нет адреса*" : hospital;
+                        multipleRequestData.Add(new HospitalAddressRequest(){ StreetId = FindStreetId(hospital.Split('*')[0]), HouseNumber = hospital.Split('*')[1] });
+                        //list[0].Add(new HospitalAddressRequest() { StreetId = FindStreetId(hospital.Split('*')[0]), HouseNumber = hospital.Split('*')[1] });
+                        if (i % 5 == 0) 
+                        { twoDemList.Add(new List<HospitalAddressRequest>()); str++; }
+                        twoDemList[str-1].Add(new HospitalAddressRequest() { StreetId = FindStreetId(hospital.Split('*')[0]), HouseNumber = hospital.Split('*')[1] });//Добавить элемент в строку
                     }
-                    var hospitals = await SendMultipleRequests(multipleRequestData);
-                    for (int i = 0; i < hospitals.Count; i++) 
+                    int j = 0;
+                    for (int i = 0; i < twoDemList.Count; i++) 
                     {
-                        worksheet.Rows[i + 2].Columns[16] = hospitals[i].SubTitle + " " + hospitals[i].Title + " " + hospitals[i].Address;
+                        var hospitals = await SendMultipleRequests(twoDemList[i]);
+                            for (int g = 0; g < hospitals.Count; g++)
+                            { worksheet.Rows[j + 2].Columns[16] = hospitals[g].SubTitle + " " + hospitals[g].Title + " " + hospitals[g].Address; j++; }
                     }
                     excelapp.AlertBeforeOverwriting = false;
                     workbook.Save();
                     excelapp.AlertBeforeOverwriting = false;
-                    connection.Close();                   
-
+                    connection.Close();              
                 }
 
                 workbook.Close(true, misValue, misValue);
                 connection.Dispose();
                 excelapp.Quit();
                 GC.Collect();
-
-            }
+          }
         }
         async Task<List<Hospital>> SendMultipleRequests(List<HospitalAddressRequest> requestList)
         {
@@ -202,10 +145,7 @@ namespace FindHosp
                             hosp.Add(new Hospital() { Id = "", Title = "", SubTitle = "", Address = "Нет взрослой поликлиники", Latitude = "", Longitude = "" });
                         returnList.AddRange(hosp);                       
                     }      
-                    if (returnList.Count()%5==0)
-                    {
-                        
-                    }
+                   
                 }
                 return returnList;
             }
@@ -236,99 +176,7 @@ namespace FindHosp
                 return allStreets[index].Split('+')[0];           
 
         }
-        /*public string SendRequest(int streetId,string streetNum)
-        {
-            
-            WebRequest request = WebRequest.Create("https://xn--80acgfbsl1azdqr.xn--p1ai/data-send/medcentral/searchclinic?");
-            // Set the Method property of the request to POST.
-            request.Method = "POST";
-            // Create POST data and convert it to a byte array.
-            string hosp;
-            string streetID = "streetID=" + streetId + "&houseNumber=" + streetNum;
-            byte[] byteArray = Encoding.UTF8.GetBytes(streetID);
-            // Set the ContentType property of the WebRequest.
-            request.ContentType = "application/x-www-form-urlencoded";
-            // Set the ContentLength property of the WebRequest.
-            request.ContentLength = byteArray.Length;
-            Stream dataStream = null;
-            // Get the request stream.
-            try
-            {
-                dataStream = request.GetRequestStream();
-            }
-            catch
-            {
-                return ("нет ответа сервера");
-            }
-            // Write the data to the request stream.
-            dataStream.Write(byteArray, 0, byteArray.Length);
-            // Close the Stream object.
-            dataStream.Close();
-            WebResponse response = null;
-            // Get the response.
-            try
-            {
-                // Do not initialize this variable here.
-                response = request.GetResponse();
-
-            }
-            catch
-            {
-                return ("нет ответа сервера");
-
-            }            
-            // Display the status.            
-            // Get the stream containing content returned by the server.
-            dataStream = response.GetResponseStream();
-            // Open the stream using a StreamReader for easy access.
-            StreamReader reader = new StreamReader(dataStream);
-            // Read the content.
-            string responseFromServer = reader.ReadToEnd();
-            // Display the content.
-            //MessageBox.Show(responseFromServer);
-            // Clean up the streams.
-            if (responseFromServer != "[]")
-            {
-                JObject json = JObject.Parse(responseFromServer);
-                hosp = json.ToString();
-                hosp = hosp.Replace("\r", "").Replace("\n", "").Replace("\"Id\":", "").Replace("\"Title\":", "").Replace("\"SubTitle\":", "").Replace("\"Address\":", "").Replace("\"Latitude\":", "");
-                hosp = hosp.Replace("\"Longitude\":", "").Replace("{  \"data\": [    {       ", "").Replace("  ", "").Replace("\"", "").Replace("\\", "").Replace("}]}", "");
-                hosp = hosp.Replace(", ", "+ ").Replace("},{ ", ", ");
-                reader.Close();
-                dataStream.Close();
-                response.Close();
-                return (hosp);
-            }
-            else
-                return ("не найдено");
-           
-        }*/
-        /* string FindHospital(string hospitalStreet)
-         {
-             string hospitals;
-             string a;
-             string b;
-             if (hospitalStreet.Split('*')[0] != "")
-             {
-                 a = hospitalStreet.Split('*')[0];
-                 b = hospitalStreet.Split('*')[1];
-                 hospitals = SendRequest(FindStreetId(a),b);
-                 List<string> hospital = new List<string>(hospitals.Split(','));
-                 if (hospital != null & hospitals != "не найдено" & hospitals != "нет ответа сервера")
-                 {
-                     hospitals = string.Join(",", hospital.FindAll(x => x.Contains("Клиника") || x.Contains("ЦГКБ") || x.Contains("ЦГБ") || x.Contains("ГКБ") || x.Contains("ООО") || x.Contains("ЕКДЦ")).Last().Split('+').Skip(1).ToArray());
-                     if (hospitals == "")
-                         return "неизвестно ЛПУ";
-                     return hospitals;
-                 }                   
-                 else
-                     return "не найдено";
-             }
-             else
-                 return "нет номера дома";
-
-         }
-         */
+       
         async void SendList(List<HospitalAddressRequest> Data, int i)
         {
             List<HospitalAddressRequest> multipleRequestData = Data;
