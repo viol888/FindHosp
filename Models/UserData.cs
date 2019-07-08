@@ -15,5 +15,6 @@ namespace FindHosp.Models
         public string Street { get; set; }
         public string House { get; set; }
         public string Building { get; set; }
+        public string Vaccine { get; set; }
     }
 }

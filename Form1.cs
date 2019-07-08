@@ -70,7 +70,7 @@ namespace FindHosp
                     connection.Open();
                     Excel.Worksheet worksheet = (Excel.Worksheet)workbook.Sheets[sht.Replace("$", "")];
                     int tempStr;
-                    string range = "SELECT * FROM " + "[" + sht + "A1" + ":" + "F" + "]";
+                    string range = "SELECT * FROM " + "[" + sht + "A1" + ":" + "G" + "]";
                     DataSet ds = new DataSet();
                     DataTable schemaTable = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Tables, new object[] { null, null, null, "TABLE" });
                     string select = String.Format(range, sht); //SELECT * FROM [Calculating$A1:D500]
@@ -89,6 +89,7 @@ namespace FindHosp
                             Street = dataGridView1.Rows[i].Cells[4].Value.ToString(),
                             House = dataGridView1.Rows[i].Cells[5].Value.ToString(),
                             Building = dataGridView1.Rows[i].Cells[6].Value.ToString(),
+                            Vaccine = dataGridView1.Rows[i].Cells[7].Value.ToString()
                         });
 
                         tempStr = dataGridView1.Rows[i].Cells[4].Value.ToString().IndexOf('.') + 1;
@@ -137,6 +138,7 @@ namespace FindHosp
                     xlWorkSheet.Cells[1, 3] = "Улица";
                     xlWorkSheet.Cells[1, 4] = "Дом";
                     xlWorkSheet.Cells[1, 5] = "К";
+                    xlWorkSheet.Cells[1, 6] = "Вакцина";
 
                     for (var i = 0; i < userHospitals.Count; i++)
                     {
@@ -145,6 +147,7 @@ namespace FindHosp
                         xlWorkSheet.Cells[i + 2, 3] = userHospitals[i].Street;
                         xlWorkSheet.Cells[i + 2, 4] = userHospitals[i].House;
                         xlWorkSheet.Cells[i + 2, 5] = userHospitals[i].Building;
+                        xlWorkSheet.Cells[i + 2, 6] = userHospitals[i].Vaccine;
                     }
                     var fileName = hospName.Key == "" ? "Без имени" : hospName.Key;
                     xlWorkBook.SaveAs(pathToFile + "\\" + fileName + ".xlsx", Microsoft.Office.Interop.Excel.XlFileFormat.xlOpenXMLWorkbook, misValue,
@@ -164,15 +167,30 @@ namespace FindHosp
             using (WebClient webClient = new WebClient())
             {
                 List<Hospital> returnList = new List<Hospital>();
+                List<HttpResponseMessage> allResponses = new List<HttpResponseMessage>();
                 try
                 {
-                    var urls = requestList.Select(item => { return "https://xn--80acgfbsl1azdqr.xn--p1ai/data-send/medcentral/searchclinic?streetID=" + item.StreetId + "&houseNumber=" + item.HouseNumber; });
-                    var requests = urls.Select(url => client.GetAsync(url));
-                    await Task.WhenAll(requests);
-                    var responses = requests.Select(task => task.Result);
-                    
+                    var tempUrlList = new List<string>();
+                    for (var i = 0; i < requestList.Count; i++)
+                    {
+                        var item = requestList[i];
+                        tempUrlList.Add("https://xn--80acgfbsl1azdqr.xn--p1ai/data-send/medcentral/searchclinic?streetID=" + item.StreetId + "&houseNumber=" + item.HouseNumber);
+                        if (tempUrlList.Count == 25)
+                        {
+                            var requests = tempUrlList.Select(url => client.GetAsync(url));
+                            await Task.WhenAll(requests);
+                            var responses = requests.Select(task => task.Result);
+                            allResponses.AddRange(responses);
+                            tempUrlList = new List<string>();
+                        }
+                    }
+                    var lastRequests = tempUrlList.Select(url => client.GetAsync(url));
+                    await Task.WhenAll(lastRequests);
+                    var lastResponses = lastRequests.Select(task => task.Result);
+                    allResponses.AddRange(lastResponses);
+                    tempUrlList = null;
 
-                    foreach (var res in responses)
+                    foreach (var res in allResponses)
                     {
                         res.EnsureSuccessStatusCode();
                         var responseBody = await res.Content.ReadAsStringAsync();
